@@ -1,0 +1,7 @@
+python-telegram-bot[webhooks]==20.*
+fastapi
+uvicorn[standard]
+aiosqlite
+python-dotenv
+qrcode[pil]
+Pillow

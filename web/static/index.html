@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Queue Display</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <div id="clock"></div>
+    <h1>Queue Management System</h1>
+  </header>
+
+  <main>
+    <!-- NOW SERVING banner -->
+    <section id="now-serving-section">
+      <div class="label">NOW SERVING</div>
+      <div id="token-number">—</div>
+      <div id="counter-name"></div>
+      <div id="customer-name"></div>
+    </section>
+
+    <!-- Per-counter status grid -->
+    <section id="counters-section">
+      <h2>Counters</h2>
+      <div id="counters-grid"></div>
+    </section>
+
+    <!-- Waiting list -->
+    <section id="waiting-section">
+      <h2>Waiting</h2>
+      <div id="waiting-list"></div>
+    </section>
+  </main>
+
+  <script>
+    // -----------------------------------------------------------------------
+    // Clock
+    // -----------------------------------------------------------------------
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock').textContent = now.toLocaleString();
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // -----------------------------------------------------------------------
+    // Beep (base64-encoded minimal WAV — a short 440 Hz sine tone)
+    // -----------------------------------------------------------------------
+    const BEEP_B64 =
+      'UklGRlQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YTAAAAB/' +
+      'f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/fw==';
+
+    function playBeep() {
+      try {
+        const audio = new Audio('data:audio/wav;base64,' + BEEP_B64);
+        audio.play().catch(() => {});
+      } catch (_) {}
+    }
+
+    // -----------------------------------------------------------------------
+    // TTS
+    // -----------------------------------------------------------------------
+    function speak(text) {
+      if (!window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.lang = 'en-US';
+      utt.rate = 0.9;
+      window.speechSynthesis.speak(utt);
+    }
+
+    // -----------------------------------------------------------------------
+    // State
+    // -----------------------------------------------------------------------
+    let lastToken = null;
+    let lastCalled = null;
+
+    function renderCounters(counters) {
+      const grid = document.getElementById('counters-grid');
+      grid.innerHTML = '';
+      counters.forEach(c => {
+        const card = document.createElement('div');
+        card.className = 'counter-card ' + (c.status === 'open' ? 'open' : 'closed');
+        card.innerHTML =
+          `<div class="counter-title">${escHtml(c.name)}</div>` +
+          `<div class="counter-token">${c.current_token !== null ? '#' + c.current_token : '—'}</div>` +
+          `<div class="counter-status">${c.status.toUpperCase()}</div>`;
+        grid.appendChild(card);
+      });
+    }
+
+    function renderWaiting(counters) {
+      const list = document.getElementById('waiting-list');
+      list.innerHTML = '';
+      counters.forEach(c => {
+        if (!c.waiting || c.waiting.length === 0) return;
+        const sec = document.createElement('div');
+        sec.className = 'waiting-counter';
+        sec.innerHTML = `<div class="waiting-counter-name">${escHtml(c.name)}</div>`;
+        const ul = document.createElement('ul');
+        c.waiting.slice(0, 10).forEach(t => {
+          const li = document.createElement('li');
+          li.textContent = `#${t.token_number}` + (t.customer_name ? ` — ${t.customer_name}` : '');
+          ul.appendChild(li);
+        });
+        if (c.waiting_count > 10) {
+          const li = document.createElement('li');
+          li.textContent = `…and ${c.waiting_count - 10} more`;
+          ul.appendChild(li);
+        }
+        sec.appendChild(ul);
+        list.appendChild(sec);
+      });
+      if (!list.children.length) {
+        list.innerHTML = '<p class="empty">No one waiting.</p>';
+      }
+    }
+
+    function renderNowServing(lastCalled) {
+      if (!lastCalled) {
+        document.getElementById('token-number').textContent = '—';
+        document.getElementById('counter-name').textContent = '';
+        document.getElementById('customer-name').textContent = '';
+        return;
+      }
+      document.getElementById('token-number').textContent = '#' + lastCalled.token;
+      document.getElementById('counter-name').textContent =
+        'at ' + (lastCalled.counter || '');
+      document.getElementById('customer-name').textContent =
+        lastCalled.customer_name ? lastCalled.customer_name : '';
+    }
+
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function onData(data) {
+      const lc = data.last_called;
+      const tokenChanged =
+        lc &&
+        (!lastCalled ||
+          lc.token !== lastCalled.token ||
+          lc.counter !== lastCalled.counter ||
+          lc.called_at !== lastCalled.called_at);
+
+      renderNowServing(lc);
+      renderCounters(data.counters || []);
+      renderWaiting(data.counters || []);
+
+      if (tokenChanged) {
+        lastCalled = lc;
+        playBeep();
+        speak(
+          `Token number ${lc.token}, please proceed to ${lc.counter}`
+        );
+        // Flash animation
+        const ns = document.getElementById('now-serving-section');
+        ns.classList.add('flash');
+        setTimeout(() => ns.classList.remove('flash'), 1500);
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // SSE connection with auto-reconnect
+    // -----------------------------------------------------------------------
+    function connect() {
+      const es = new EventSource('/events');
+      es.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          onData(data);
+        } catch (_) {}
+      };
+      es.onerror = () => {
+        es.close();
+        setTimeout(connect, 3000);
+      };
+    }
+    connect();
+  </script>
+</body>
+</html>
