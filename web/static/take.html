@@ -18,9 +18,12 @@
         </div>
 
         <div class="form-group">
-          <label for="department">Department / Counter *</label>
+          <label for="department">
+            Department / Counter *
+            <span id="counter-status-hint" style="font-size:0.75rem;color:#aaa;margin-left:0.4rem;"></span>
+          </label>
           <select id="department" name="department" required>
-            <option value="">— Select —</option>
+            <option value="">— Loading counters… —</option>
           </select>
         </div>
 
@@ -46,33 +49,70 @@
   </div>
 
   <script>
-    // Load open counters into the dropdown
+    let _counters = [];
+    let _refreshInterval = null;
+
+    // Load counters and populate the dropdown.
+    // Keeps the user's current selection if it's still valid.
     async function loadCounters() {
       const sel = document.getElementById('department');
+      const previousValue = sel.value;
+
       try {
         const res = await fetch('/api/counters');
-        const counters = await res.json();
-        counters.forEach(c => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        _counters = await res.json();
+
+        // Rebuild options
+        sel.innerHTML = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = '— Select department —';
+        sel.appendChild(placeholder);
+
+        let openCount = 0;
+        _counters.forEach(c => {
           const opt = document.createElement('option');
           opt.value = c.id;
-          opt.textContent = c.name;
+          const isOpen = c.status === 'open';
+          if (isOpen) {
+            opt.textContent = c.name;
+            openCount++;
+          } else {
+            opt.textContent = c.name + ' (closed)';
+            opt.disabled = true;
+            opt.style.color = '#888';
+          }
           sel.appendChild(opt);
         });
-        if (!counters.length) {
-          const opt = document.createElement('option');
-          opt.textContent = 'No counters open';
-          opt.disabled = true;
-          sel.appendChild(opt);
+
+        // Restore previous selection if still open
+        if (previousValue) {
+          const stillOpen = _counters.find(
+            c => String(c.id) === String(previousValue) && c.status === 'open'
+          );
+          sel.value = stillOpen ? previousValue : '';
         }
+
+        // Status hint
+        const hint = document.getElementById('counter-status-hint');
+        if (_counters.length === 0) {
+          hint.textContent = '(no counters configured)';
+        } else if (openCount === 0) {
+          hint.textContent = '(all counters closed — please wait)';
+        } else {
+          hint.textContent = `(${openCount} open)`;
+        }
+
       } catch (err) {
         console.error('Failed to load counters:', err);
-        const opt = document.createElement('option');
-        opt.textContent = 'Error loading counters';
-        opt.disabled = true;
-        sel.appendChild(opt);
+        sel.innerHTML = '<option disabled>Error loading — retrying…</option>';
       }
     }
+
+    // Initial load + auto-refresh every 5 seconds
     loadCounters();
+    _refreshInterval = setInterval(loadCounters, 5000);
 
     document.getElementById('token-form').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -97,6 +137,9 @@
           btn.textContent = 'Get Token';
           return;
         }
+
+        // Stop refreshing the dropdown once a token is taken
+        clearInterval(_refreshInterval);
 
         const sel = document.getElementById('department');
         const counterName = sel.options[sel.selectedIndex].text;

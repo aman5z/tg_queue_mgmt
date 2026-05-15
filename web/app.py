@@ -28,7 +28,7 @@ _static_dir = os.path.join(os.path.dirname(__file__), "static")
 app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 
 # ---------------------------------------------------------------------------
-# Pre-load static HTML files at startup (avoids blocking I/O per request)
+# Pre-load static HTML files at startup
 # ---------------------------------------------------------------------------
 _html_cache: dict[str, str] = {}
 
@@ -83,8 +83,6 @@ async def take_page():
 
 @app.get("/track/{token_id}", response_class=HTMLResponse)
 async def track_page(token_id: int):
-    # token_id is validated as int by FastAPI path param; explicit int() + json.dumps
-    # ensures only a numeric literal is embedded in the JavaScript context.
     safe_id = json.dumps(int(token_id))
     content = _html_cache.get("track.html", "").replace("{{TOKEN_ID}}", safe_id)
     return HTMLResponse(content=content)
@@ -92,8 +90,12 @@ async def track_page(token_id: int):
 
 @app.get("/api/counters")
 async def api_counters():
-    counters = await get_counters(include_closed=False)
-    return JSONResponse([{"id": c["id"], "name": c["name"]} for c in counters])
+    """Return ALL counters with their status so the take page can show open vs closed."""
+    counters = await get_counters(include_closed=True)
+    return JSONResponse([
+        {"id": c["id"], "name": c["name"], "status": c["status"]}
+        for c in counters
+    ])
 
 
 @app.post("/api/token")
@@ -105,6 +107,14 @@ async def api_take_token(request: Request):
 
     if not name or not counter_id:
         return JSONResponse({"error": "name and counter_id are required"}, status_code=400)
+
+    # Verify counter is open
+    from db.database import get_counter
+    counter = await get_counter(int(counter_id))
+    if not counter:
+        return JSONResponse({"error": "Counter not found"}, status_code=404)
+    if counter["status"] != "open":
+        return JSONResponse({"error": "This counter is currently closed"}, status_code=400)
 
     token = await create_token(
         counter_id=int(counter_id),
@@ -151,7 +161,6 @@ async def sse_events(request: Request):
                     payload = await asyncio.wait_for(q.get(), timeout=20)
                     yield f"data: {payload}\n\n"
                 except asyncio.TimeoutError:
-                    # Keepalive ping
                     yield ": ping\n\n"
         finally:
             if q in _sse_queues:
