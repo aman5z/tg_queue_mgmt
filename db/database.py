@@ -238,6 +238,7 @@ async def call_previous_token(counter_id: int) -> Optional[dict]:
         return None
     current_id = counter["current_token_id"]
     async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
         # Find the done token just before current
         cursor = await db.execute(
             """
@@ -247,7 +248,6 @@ async def call_previous_token(counter_id: int) -> Optional[dict]:
             """,
             (counter_id, current_id),
         )
-        db.row_factory = aiosqlite.Row
         row = await cursor.fetchone()
         if not row:
             return None

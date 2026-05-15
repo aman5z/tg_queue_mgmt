@@ -345,6 +345,7 @@ main {
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
-.track-box .status-badge.waiting { background: #1a1a3a; color: var(--muted); border: 1px solid var(--border); }
-.track-box .status-badge.serving { background: #0f2a10; color: var(--green); border: 1px solid var(--green); }
-.track-box .status-badge.done    { background: #2a1010; color: var(--red);   border: 1px solid var(--red); }
+.track-box .status-badge.waiting  { background: #1a1a3a; color: var(--muted); border: 1px solid var(--border); }
+.track-box .status-badge.serving  { background: #0f2a10; color: var(--green); border: 1px solid var(--green); }
+.track-box .status-badge.done     { background: #2a1010; color: var(--red);   border: 1px solid var(--red);   }
+.track-box .status-badge.skipped  { background: #2a1a00; color: #cc8800;      border: 1px solid #cc8800;      }

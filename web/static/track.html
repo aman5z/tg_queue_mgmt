@@ -59,7 +59,8 @@
         badge.className = 'status-badge ' + d.status;
         const labels = { waiting: '⏳ Waiting', serving: '✅ Being Served', done: '✔ Done', skipped: 'Skipped' };
         badge.textContent = labels[d.status] || d.status;
-      } catch (_) {
+      } catch (err) {
+        console.error('Failed to fetch token status:', err);
         document.getElementById('serving-info').textContent = 'Connection error. Retrying…';
       }
     }

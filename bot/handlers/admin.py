@@ -417,7 +417,7 @@ async def callback_token_waiting(update: Update, context: ContextTypes.DEFAULT_T
     )
 
 
-async def callback_counter_rename(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def callback_counter_rename(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
     cid = int(query.data.split(":")[1])
@@ -464,7 +464,7 @@ async def callback_confirm_no(update: Update, context: ContextTypes.DEFAULT_TYPE
     await query.edit_message_text("❌ Action cancelled.")
 
 
-async def callback_counter_add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def callback_counter_add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
     await query.edit_message_text("➕ Send the name for the new counter:")
@@ -510,8 +510,6 @@ async def receive_rename_name(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 def register_admin_handlers(app) -> None:
     """Register all admin-related handlers with the bot application."""
-    from telegram.ext import filters as f
-
     app.add_handler(CommandHandler("counters", cmd_counters))
     app.add_handler(CommandHandler("addcounter", cmd_addcounter))
     app.add_handler(CommandHandler("renamecounter", cmd_renamecounter))
@@ -523,13 +521,11 @@ def register_admin_handlers(app) -> None:
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("qr", cmd_qr))
 
-    # Inline keyboard callbacks
+    # Inline keyboard callbacks (exclude add/rename — handled by ConversationHandler below)
     app.add_handler(CallbackQueryHandler(callback_counter_list, pattern="^counter_list$"))
     app.add_handler(CallbackQueryHandler(callback_counter_select, pattern="^counter_select:"))
     app.add_handler(CallbackQueryHandler(callback_counter_open, pattern="^counter_open:"))
     app.add_handler(CallbackQueryHandler(callback_counter_close, pattern="^counter_close:"))
-    app.add_handler(CallbackQueryHandler(callback_counter_add, pattern="^counter_add$"))
-    app.add_handler(CallbackQueryHandler(callback_counter_rename, pattern="^counter_rename:"))
     app.add_handler(CallbackQueryHandler(callback_counter_remove, pattern="^counter_remove:"))
     app.add_handler(CallbackQueryHandler(callback_token_next, pattern="^token_next:"))
     app.add_handler(CallbackQueryHandler(callback_token_prev, pattern="^token_prev:"))
@@ -539,15 +535,18 @@ def register_admin_handlers(app) -> None:
     app.add_handler(CallbackQueryHandler(callback_confirm_yes, pattern="^confirm_yes:"))
     app.add_handler(CallbackQueryHandler(callback_confirm_no, pattern="^confirm_no$"))
 
-    # Conversation: receive new counter name (after clicking "Add Counter" button)
+    # ConversationHandler: inline "Add Counter" / "Rename" buttons trigger a text reply flow
     conv = ConversationHandler(
-        entry_points=[],
+        entry_points=[
+            CallbackQueryHandler(callback_counter_add, pattern="^counter_add$"),
+            CallbackQueryHandler(callback_counter_rename, pattern="^counter_rename:"),
+        ],
         states={
             WAITING_COUNTER_NAME: [
-                MessageHandler(f.TEXT & ~f.COMMAND, receive_counter_name)
+                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_counter_name)
             ],
             WAITING_RENAME_NAME: [
-                MessageHandler(f.TEXT & ~f.COMMAND, receive_rename_name)
+                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_rename_name)
             ],
         },
         fallbacks=[],

@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import os
 from typing import AsyncIterator
 
@@ -18,11 +19,29 @@ from db.database import (
     get_current_token_for_counter,
 )
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="Queue Management")
 
 # Mount static files
 _static_dir = os.path.join(os.path.dirname(__file__), "static")
 app.mount("/static", StaticFiles(directory=_static_dir), name="static")
+
+# ---------------------------------------------------------------------------
+# Pre-load static HTML files at startup (avoids blocking I/O per request)
+# ---------------------------------------------------------------------------
+_html_cache: dict[str, str] = {}
+
+
+@app.on_event("startup")
+async def _preload_html() -> None:
+    from db.database import init_db
+    await init_db()
+    for name in ("index.html", "take.html", "track.html"):
+        path = os.path.join(_static_dir, name)
+        with open(path, encoding="utf-8") as f:
+            _html_cache[name] = f.read()
+
 
 # ---------------------------------------------------------------------------
 # SSE broadcast helpers
@@ -45,7 +64,7 @@ async def broadcast_update() -> None:
         for q in dead:
             _sse_queues.remove(q)
     except Exception:
-        pass
+        logger.exception("broadcast_update failed")
 
 
 # ---------------------------------------------------------------------------
@@ -54,24 +73,21 @@ async def broadcast_update() -> None:
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
-    path = os.path.join(_static_dir, "index.html")
-    with open(path) as f:
-        return HTMLResponse(content=f.read())
+    return HTMLResponse(content=_html_cache.get("index.html", ""))
 
 
 @app.get("/take", response_class=HTMLResponse)
 async def take_page():
-    path = os.path.join(_static_dir, "take.html")
-    with open(path) as f:
-        return HTMLResponse(content=f.read())
+    return HTMLResponse(content=_html_cache.get("take.html", ""))
 
 
 @app.get("/track/{token_id}", response_class=HTMLResponse)
 async def track_page(token_id: int):
-    path = os.path.join(_static_dir, "track.html")
-    with open(path) as f:
-        content = f.read().replace("{{TOKEN_ID}}", str(token_id))
-        return HTMLResponse(content=content)
+    # token_id is validated as int by FastAPI path param; explicit int() + json.dumps
+    # ensures only a numeric literal is embedded in the JavaScript context.
+    safe_id = json.dumps(int(token_id))
+    content = _html_cache.get("track.html", "").replace("{{TOKEN_ID}}", safe_id)
+    return HTMLResponse(content=content)
 
 
 @app.get("/api/counters")

@@ -64,7 +64,8 @@
           opt.disabled = true;
           sel.appendChild(opt);
         }
-      } catch (_) {
+      } catch (err) {
+        console.error('Failed to load counters:', err);
         const opt = document.createElement('option');
         opt.textContent = 'Error loading counters';
         opt.disabled = true;
