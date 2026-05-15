@@ -28,6 +28,20 @@
 
   <script>
     const TOKEN_ID = {{TOKEN_ID}};
+    let lastStatus = null;
+
+    // -----------------------------------------------------------------------
+    // Text-to-Speech helper
+    // -----------------------------------------------------------------------
+    function speak(text) {
+      if (!window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.rate = 0.9;
+      utt.pitch = 1;
+      utt.volume = 1;
+      window.speechSynthesis.speak(utt);
+    }
 
     async function fetchStatus() {
       try {
@@ -60,6 +74,12 @@
         badge.className = 'status-badge ' + d.status;
         const labels = { waiting: '⏳ Waiting', serving: '✅ Being Served', done: '✔ Done', skipped: 'Skipped' };
         badge.textContent = labels[d.status] || d.status;
+
+        // Announce via TTS when this token transitions to "serving"
+        if (d.status === 'serving' && lastStatus !== 'serving') {
+          speak(`Your token number ${d.token_number} is now being served. Please proceed to the counter.`);
+        }
+        lastStatus = d.status;
       } catch (err) {
         console.error('Failed to fetch token status:', err);
         document.getElementById('serving-info').textContent = 'Connection error. Retrying…';
