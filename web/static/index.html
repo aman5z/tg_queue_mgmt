@@ -3,14 +3,26 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Queue Display</title>
+  <title>{{DISPLAY_TITLE}}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon_tv.svg" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
+  <button id="fullscreen-btn" class="tts-settings-btn left" aria-label="Toggle fullscreen">⛶</button>
   <button id="tts-settings-btn" class="tts-settings-btn" aria-label="Open TTS settings">⚙️</button>
   <div id="tts-overlay" class="tts-overlay hidden">
     <div class="tts-panel">
       <h3>TTS Settings</h3>
+      <div class="form-group">
+        <label for="display-theme">Theme</label>
+        <select id="display-theme">
+          <option value="dark">Dark</option>
+          <option value="midnight">Midnight</option>
+          <option value="light">Light</option>
+          <option value="red">Red Alert</option>
+          <option value="green">Matrix</option>
+        </select>
+      </div>
       <div class="form-group">
         <label for="tts-lang-filter">Language filter</label>
         <input type="text" id="tts-lang-filter" placeholder="Filter by language, e.g. en, ms, ar" />
@@ -39,7 +51,8 @@
   </div>
   <header>
     <div id="clock"></div>
-    <h1>Queue Management System</h1>
+    <h1>{{DISPLAY_TITLE}}</h1>
+    <div id="weather-info" style="font-size:0.9rem;color:var(--muted);text-align:right;min-width:16ch;"></div>
   </header>
 
   <main>
@@ -70,10 +83,47 @@
     // -----------------------------------------------------------------------
     function updateClock() {
       const now = new Date();
-      document.getElementById('clock').textContent = now.toLocaleString();
+      const dateLine = now.toLocaleDateString(undefined, {
+        weekday: 'long',
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+      });
+      const timeLine = now.toLocaleTimeString(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+      document.getElementById('clock').textContent = `${dateLine}\n${timeLine}`;
     }
     setInterval(updateClock, 1000);
     updateClock();
+
+    const WMO_ICONS = {
+      0: '☀️', 1: '🌤️', 2: '⛅', 3: '🌥️', 45: '🌫️', 48: '🌫️', 51: '🌦️', 53: '🌦️', 55: '🌦️',
+      61: '🌧️', 63: '🌧️', 65: '🌧️', 71: '❄️', 73: '❄️', 75: '❄️', 80: '🌧️', 81: '🌧️', 82: '🌧️', 95: '⛈️'
+    };
+    async function fetchWeather() {
+      if (!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(async pos => {
+        const { latitude: lat, longitude: lon } = pos.coords;
+        try {
+          const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
+          const d = await r.json();
+          const w = d.current_weather;
+          const icon = WMO_ICONS[w.weathercode] || '🌡️';
+          document.getElementById('weather-info').textContent = `${icon} ${w.temperature}°C`;
+        } catch (err) {
+          console.warn('Weather fetch failed', err);
+          document.getElementById('weather-info').textContent = 'Weather unavailable';
+        }
+      }, () => {
+        console.warn('Geolocation unavailable or denied');
+        document.getElementById('weather-info').textContent = 'Weather unavailable';
+      });
+    }
+    fetchWeather();
+    setInterval(fetchWeather, 10 * 60 * 1000);
 
     // -----------------------------------------------------------------------
     // Beep (base64-encoded minimal WAV — a short 440 Hz sine tone)
@@ -95,6 +145,7 @@
     const DEFAULT_TTS_RATE = '0.9';
     const DEFAULT_TTS_PITCH = '1';
     const DEFAULT_TTS_VOLUME = '1';
+    const DEFAULT_THEME = 'dark';
     let allVoices = [];
 
     function setDefaultTtsSettings() {
@@ -114,6 +165,18 @@
       document.getElementById('tts-rate-value').textContent = rate;
       document.getElementById('tts-pitch-value').textContent = pitch;
       document.getElementById('tts-volume-value').textContent = volume;
+    }
+
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('display_theme', theme);
+      const select = document.getElementById('display-theme');
+      if (select) select.value = theme;
+    }
+
+    function restoreTheme() {
+      const theme = localStorage.getItem('display_theme') || DEFAULT_THEME;
+      applyTheme(theme);
     }
 
     function saveSliderSetting(key, valueId, value) {
@@ -281,8 +344,22 @@
     document.getElementById('tts-settings-btn').addEventListener('click', () => {
       document.getElementById('tts-overlay').classList.remove('hidden');
     });
+    document.getElementById('fullscreen-btn').addEventListener('click', async () => {
+      try {
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+        } else {
+          await document.exitFullscreen();
+        }
+      } catch (_) {
+        console.warn('Fullscreen request failed');
+      }
+    });
     document.getElementById('tts-close-btn').addEventListener('click', () => {
       document.getElementById('tts-overlay').classList.add('hidden');
+    });
+    document.getElementById('display-theme').addEventListener('change', (e) => {
+      applyTheme(e.target.value);
     });
     document.getElementById('tts-lang-filter').addEventListener('input', renderVoiceOptions);
     document.getElementById('tts-voice').addEventListener('change', (e) => {
@@ -300,6 +377,7 @@
     document.getElementById('tts-test-btn').addEventListener('click', () => {
       speak('Token number 5, please proceed to Counter A');
     });
+    restoreTheme();
     connect();
   </script>
 </body>

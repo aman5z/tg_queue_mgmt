@@ -31,6 +31,8 @@ from db.database import (
     update_staff_password,
     update_staff_counters,
     set_staff_active,
+    get_setting,
+    set_setting,
 )
 from bot.keyboards import counters_keyboard, counter_actions_keyboard, confirm_keyboard
 from web.app import broadcast_update
@@ -225,27 +227,31 @@ async def cmd_resetqueue(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = (
-        "🤖 *Queue Management Bot*\n\n"
+        "🤖 Queue Management Bot\n\n"
         "*Admin Commands:*\n"
         "/counters — list counters\n"
-        "/addcounter <name> — add counter\n"
-        "/renamecounter <id> <name> — rename\n"
-        "/removecounter <id> — remove\n"
+        "/addcounter <name> — add counter (opens automatically)\n"
+        "/renamecounter <id> <name> — rename counter\n"
+        "/removecounter <id> — remove counter\n"
         "/opencounter <id> — open counter\n"
         "/closecounter <id> — close counter\n"
         "/resetqueue — clear all queues\n"
-        "/status — overall status\n"
-        "/qr — generate QR for token page\n"
-        "/users — list staff users\n"
-        "/adduser <username> <password> [display name] — add staff user\n"
-        "/removeuser <username> — remove staff user\n"
-        "/setpassword <username> <new password> — set staff password\n"
-        "/assigncounters <username> <counter_id,...> — assign counters\n"
-        "/deactivateuser <username> — disable staff login\n"
-        "/activateuser <username> — enable staff login\n"
-        "/help — this message\n\n"
-        "*Customer Commands:*\n"
-        "/start — take a token\n"
+        "/status — overall queue status\n"
+        "/qr — QR code for /take page\n\n"
+        "*Server Settings:*\n"
+        "/editserver title <text> — set display page title\n"
+        "/editserver taketitle <text> — set take-token page title\n"
+        "/editserver port <number> — change server port (requires restart)\n"
+        "/editserver show — show current settings\n\n"
+        "*Staff Management:*\n"
+        "/users — list all staff\n"
+        "/adduser <user> <pass> [name] — create staff user\n"
+        "/removeuser <username> — remove staff\n"
+        "/setpassword <user> <pass> — change password\n"
+        "/assigncounters <user> <id,...> — assign counters\n"
+        "/deactivateuser <username> — disable login\n"
+        "/activateuser <username> — re-enable\n\n"
+        "/help — this message"
     )
     await update.effective_message.reply_text(text, parse_mode="Markdown")
 
@@ -632,6 +638,55 @@ async def cmd_activateuser(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     await update.message.reply_text(f"✅ User *{username}* activated.", parse_mode="Markdown")
 
 
+async def cmd_editserver(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _require_admin(update):
+        return
+    if not context.args:
+        await update.message.reply_text(
+            "Usage:\n"
+            "/editserver title <text>\n"
+            "/editserver taketitle <text>\n"
+            "/editserver port <number>\n"
+            "/editserver show"
+        )
+        return
+
+    action = context.args[0].strip().lower()
+    if action == "show":
+        display_title = await get_setting("display_title", "Queue Management System")
+        take_title = await get_setting("take_title", "Take a Token")
+        port = await get_setting("port", "")
+        await update.message.reply_text(
+            "⚙️ *Server Settings*\n"
+            f"display_title: {display_title}\n"
+            f"take_title: {take_title}\n"
+            f"port: {port or '(default)'}",
+            parse_mode="Markdown",
+        )
+        return
+
+    value = " ".join(context.args[1:]).strip()
+    if action in {"title", "taketitle"}:
+        if not value:
+            await update.message.reply_text(f"Usage: /editserver {action} <text>")
+            return
+        key = "display_title" if action == "title" else "take_title"
+        await set_setting(key, value)
+        await update.message.reply_text("✅ Setting updated.")
+        await broadcast_update()
+        return
+
+    if action == "port":
+        if not value or not value.isdigit():
+            await update.message.reply_text("Usage: /editserver port <number>")
+            return
+        await set_setting("port", value)
+        await update.message.reply_text("✅ Port updated. Restart is required for this change to take effect.")
+        return
+
+    await update.message.reply_text("Unknown option. Use /editserver show")
+
+
 async def receive_rename_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     name = update.message.text.strip()
     cid = context.user_data.get("renaming_counter_id")
@@ -661,6 +716,7 @@ def register_admin_handlers(app) -> None:
     app.add_handler(CommandHandler("closecounter", cmd_closecounter))
     app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CommandHandler("resetqueue", cmd_resetqueue))
+    app.add_handler(CommandHandler("editserver", cmd_editserver))
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("qr", cmd_qr))
     app.add_handler(CommandHandler("users", cmd_users))

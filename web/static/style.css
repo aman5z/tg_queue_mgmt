@@ -13,6 +13,12 @@
   --font: 'Segoe UI', Arial, sans-serif;
 }
 
+[data-theme="dark"] { --bg: #0a0a1a; --surface: #12122a; --border: #2a2a4a; --accent: #f0c040; --green: #22dd66; --red: #ee3355; --text: #e8e8f0; --muted: #888aaa; }
+[data-theme="midnight"] { --bg: #000010; --surface: #0a0a20; --border: #001133; --accent: #00ffff; --green: #00ff88; --red: #ff4466; --text: #e0f0ff; --muted: #6090aa; }
+[data-theme="light"] { --bg: #f0f2f5; --surface: #ffffff; --border: #d0d4dc; --accent: #1a73e8; --green: #1a8a3a; --red: #d93025; --text: #1a1a2e; --muted: #5f6368; }
+[data-theme="red"] { --bg: #0d0000; --surface: #1a0000; --border: #3a0000; --accent: #ff3333; --green: #ff8800; --red: #ff6666; --text: #ffe0e0; --muted: #aa6666; }
+[data-theme="green"] { --bg: #000d00; --surface: #001a00; --border: #003300; --accent: #00ff41; --green: #00cc33; --red: #ff4444; --text: #e0ffe0; --muted: #60aa60; }
+
 html, body {
   height: 100%;
   background: var(--bg);
@@ -42,6 +48,7 @@ header h1 {
   font-size: 1rem;
   color: var(--muted);
   min-width: 18ch;
+  white-space: pre-line;
 }
 
 /* ===== Main Layout ===== */
@@ -378,6 +385,7 @@ main {
   font-size: 1.2rem;
   cursor: pointer;
 }
+.tts-settings-btn.left { left: 1rem; right: auto; }
 .tts-overlay {
   position: fixed;
   inset: 0;

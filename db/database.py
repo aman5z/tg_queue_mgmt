@@ -43,6 +43,11 @@ CREATE TABLE IF NOT EXISTS staff (
     is_active INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL DEFAULT ''
+);
 """
 
 
@@ -50,6 +55,19 @@ async def init_db() -> None:
     """Create tables if they do not exist."""
     async with aiosqlite.connect(DB_PATH) as db:
         await db.executescript(SCHEMA)
+        await db.commit()
+
+
+async def get_setting(key: str, default: str = "") -> str:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute("SELECT value FROM settings WHERE key = ?", (key,))
+        row = await cursor.fetchone()
+        return row[0] if row else default
+
+
+async def set_setting(key: str, value: str) -> None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
         await db.commit()
 
 
@@ -415,7 +433,17 @@ async def call_previous_token(counter_id: int) -> Optional[dict]:
 
 async def recall_current_token(counter_id: int) -> Optional[dict]:
     """Re-announce (recall) the current token without changing anything."""
-    return await get_current_token_for_counter(counter_id)
+    counter = await get_counter(counter_id)
+    if not counter or not counter.get("current_token_id"):
+        return None
+    token_id = counter["current_token_id"]
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE tokens SET called_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (token_id,),
+        )
+        await db.commit()
+    return await get_token(token_id)
 
 
 async def reset_queue(counter_id: Optional[int] = None) -> None:
