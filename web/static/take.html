@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Take a Token</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="form-page">
+    <div class="form-card">
+      <h1>🎫 Take a Token</h1>
+
+      <form id="token-form">
+        <div class="form-group">
+          <label for="name">Your Name *</label>
+          <input type="text" id="name" name="name" placeholder="Enter your name" required />
+        </div>
+
+        <div class="form-group">
+          <label for="department">Department / Counter *</label>
+          <select id="department" name="department" required>
+            <option value="">— Select —</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="purpose">Purpose (optional)</label>
+          <textarea id="purpose" name="purpose" rows="2" placeholder="What is this visit for?"></textarea>
+        </div>
+
+        <button type="submit" class="btn-primary" id="submit-btn">Get Token</button>
+      </form>
+
+      <div id="result" class="token-result" style="display:none">
+        <div class="big-number" id="result-token">—</div>
+        <div class="hint">Your token number</div>
+        <p id="result-counter" style="margin-top:0.7rem;color:#aaa;"></p>
+        <p style="margin-top:1.5rem;">
+          <a id="track-link" href="#" style="color:#f0c040;font-weight:700;">
+            📍 Track your token live
+          </a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Load open counters into the dropdown
+    async function loadCounters() {
+      const sel = document.getElementById('department');
+      try {
+        const res = await fetch('/api/counters');
+        const counters = await res.json();
+        counters.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = c.name;
+          sel.appendChild(opt);
+        });
+        if (!counters.length) {
+          const opt = document.createElement('option');
+          opt.textContent = 'No counters open';
+          opt.disabled = true;
+          sel.appendChild(opt);
+        }
+      } catch (_) {
+        const opt = document.createElement('option');
+        opt.textContent = 'Error loading counters';
+        opt.disabled = true;
+        sel.appendChild(opt);
+      }
+    }
+    loadCounters();
+
+    document.getElementById('token-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+      btn.textContent = 'Processing…';
+
+      const name = document.getElementById('name').value.trim();
+      const counter_id = document.getElementById('department').value;
+      const purpose = document.getElementById('purpose').value.trim();
+
+      try {
+        const res = await fetch('/api/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, counter_id, purpose }),
+        });
+        const data = await res.json();
+        if (data.error) {
+          alert('Error: ' + data.error);
+          btn.disabled = false;
+          btn.textContent = 'Get Token';
+          return;
+        }
+
+        const sel = document.getElementById('department');
+        const counterName = sel.options[sel.selectedIndex].text;
+
+        document.getElementById('result-token').textContent = '#' + data.token_number;
+        document.getElementById('result-counter').textContent = 'Counter: ' + counterName;
+        document.getElementById('track-link').href = '/track/' + data.token_id;
+        document.getElementById('token-form').style.display = 'none';
+        document.getElementById('result').style.display = 'block';
+      } catch (err) {
+        alert('Network error. Please try again.');
+        btn.disabled = false;
+        btn.textContent = 'Get Token';
+      }
+    });
+  </script>
+</body>
+</html>

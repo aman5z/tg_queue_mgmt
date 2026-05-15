@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Track Your Token</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="form-page">
+    <div class="form-card">
+      <h1>📍 Token Tracker</h1>
+      <div class="track-box" id="track-box">
+        <div class="your-token">Your token</div>
+        <div class="big-number" id="your-number">—</div>
+
+        <div class="serving-info" id="serving-info"></div>
+        <div class="ahead-info" id="ahead-info"></div>
+        <div id="status-badge"></div>
+
+        <p style="margin-top:2rem;font-size:0.85rem;color:#666;">
+          Auto-refreshes every 5 seconds
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const TOKEN_ID = {{TOKEN_ID}};
+
+    async function fetchStatus() {
+      try {
+        const res = await fetch(`/api/track/${TOKEN_ID}`);
+        if (!res.ok) {
+          document.getElementById('serving-info').textContent = 'Token not found.';
+          return;
+        }
+        const d = await res.json();
+
+        document.getElementById('your-number').textContent = '#' + d.token_number;
+
+        if (d.current_serving !== null) {
+          document.getElementById('serving-info').textContent =
+            `Currently serving: #${d.current_serving}`;
+        } else {
+          document.getElementById('serving-info').textContent = 'No token being served yet.';
+        }
+
+        const aheadEl = document.getElementById('ahead-info');
+        if (d.status === 'waiting') {
+          aheadEl.textContent = d.ahead === 0
+            ? 'You\'re next!'
+            : `People ahead: ${d.ahead}`;
+        } else {
+          aheadEl.textContent = '';
+        }
+
+        const badge = document.getElementById('status-badge');
+        badge.className = 'status-badge ' + d.status;
+        const labels = { waiting: '⏳ Waiting', serving: '✅ Being Served', done: '✔ Done', skipped: 'Skipped' };
+        badge.textContent = labels[d.status] || d.status;
+      } catch (_) {
+        document.getElementById('serving-info').textContent = 'Connection error. Retrying…';
+      }
+    }
+
+    fetchStatus();
+    setInterval(fetchStatus, 5000);
+  </script>
+</body>
+</html>
