@@ -34,10 +34,15 @@ tg_queue_mgmt/
 ├── web/
 │   ├── app.py             # FastAPI app with SSE /events endpoint
 │   └── static/
-│       ├── index.html     # TV display page
-│       ├── style.css      # Dark-theme styles
-│       ├── take.html      # Customer token-take form
-│       └── track.html     # Customer token-tracking page
+│       ├── index.html           # TV display page
+│       ├── take.html            # Customer token-take form
+│       ├── track.html           # Customer token-tracking page
+│       ├── staff_login.html     # Staff login page
+│       ├── staff_dashboard.html # Staff dashboard page
+│       ├── style.css            # Dark-theme styles
+│       ├── favicon_tv.svg       # Favicon for display page
+│       ├── favicon_ticket.svg   # Favicon for take/track pages
+│       └── favicon_staff.svg    # Favicon for staff pages
 ├── db/
 │   └── database.py        # DB init + all CRUD helpers
 ├── setup.sh               # One-shot setup (venv + deps + .env)
@@ -103,6 +108,7 @@ nano .env
 | `PORT` | optional | Web server port (default `8000`) |
 | `SECRET_KEY` | ✅ | Secret used to sign staff dashboard session cookies |
 | `SESSION_COOKIE_SECURE` | optional | Set `true` in HTTPS deployments so staff session cookie is sent only over TLS |
+| `DB_PATH` | optional | Path to the SQLite database file (default `queue.db` in working directory) |
 
 > **Tip:** To get your Telegram user ID, message [@userinfobot](https://t.me/userinfobot).
 
@@ -140,6 +146,10 @@ This starts both the Telegram bot (long-polling) and the FastAPI web server on p
 | `/assigncounters <username> <counter_id,...>` | Assign counters to staff |
 | `/deactivateuser <username>` | Disable staff login |
 | `/activateuser <username>` | Re-enable staff login |
+| `/editserver title <text>` | Set the display page title |
+| `/editserver taketitle <text>` | Set the take-token page title |
+| `/editserver port <number>` | Change the web server port (requires restart) |
+| `/editserver show` | Show current server settings |
 | `/help` | Command reference |
 
 **Inline keyboard actions** (via `/counters`):
