@@ -113,8 +113,14 @@
           const w = d.current_weather;
           const icon = WMO_ICONS[w.weathercode] || '🌡️';
           document.getElementById('weather-info').textContent = `${icon} ${w.temperature}°C`;
-        } catch (_) {}
-      }, () => {});
+        } catch (err) {
+          console.warn('Weather fetch failed', err);
+          document.getElementById('weather-info').textContent = 'Weather unavailable';
+        }
+      }, () => {
+        console.warn('Geolocation unavailable or denied');
+        document.getElementById('weather-info').textContent = 'Weather unavailable';
+      });
     }
     fetchWeather();
     setInterval(fetchWeather, 10 * 60 * 1000);
@@ -339,10 +345,14 @@
       document.getElementById('tts-overlay').classList.remove('hidden');
     });
     document.getElementById('fullscreen-btn').addEventListener('click', async () => {
-      if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen();
-      } else {
-        await document.exitFullscreen();
+      try {
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen();
+        } else {
+          await document.exitFullscreen();
+        }
+      } catch (_) {
+        console.warn('Fullscreen request failed');
       }
     });
     document.getElementById('tts-close-btn').addEventListener('click', () => {
