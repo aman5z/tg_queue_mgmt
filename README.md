@@ -191,11 +191,11 @@ All API endpoints are served by the FastAPI web server on port 8000.
 |---|---|---|
 | `GET` | `/` | TV display page (full-screen token board) |
 | `GET` | `/take` | Customer token-take form |
-| `GET` | `/track/<id>` | Live token tracking page for a specific token |
+| `GET` | `/track/{id}` | Live token tracking page for a specific token |
 | `GET` | `/events` | SSE stream — real-time status updates for the display page |
 | `GET` | `/api/counters` | JSON list of all counters with `id`, `name`, and `status` |
 | `POST` | `/api/token` | Take a new token. Body: `{"name": str, "counter_id": int, "purpose": str\|null}` |
-| `GET` | `/api/track/<id>` | JSON tracking info for a token: position, status, current serving number |
+| `GET` | `/api/track/{id}` | JSON tracking info for a token: position, status, current serving number |
 
 ### Staff Endpoints (session cookie required)
 
