@@ -101,7 +101,8 @@ nano .env
 | `ADMIN_IDS` | recommended | Comma-separated Telegram user IDs with admin access |
 | `BASE_URL` | optional | Public URL of this server (default `http://localhost:8000`) |
 | `PORT` | optional | Web server port (default `8000`) |
-| `SECRET_KEY` | recommended | Secret used to sign staff dashboard session cookies |
+| `SECRET_KEY` | ✅ | Secret used to sign staff dashboard session cookies |
+| `SESSION_COOKIE_SECURE` | optional | Set `true` in HTTPS deployments so staff session cookie is sent only over TLS |
 
 > **Tip:** To get your Telegram user ID, message [@userinfobot](https://t.me/userinfobot).
 

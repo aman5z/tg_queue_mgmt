@@ -1,8 +1,10 @@
 """Database initialisation and CRUD helpers for tg_queue_mgmt."""
 
 import aiosqlite
+import hmac
 import hashlib
 import os
+import secrets
 from typing import Optional
 
 DB_PATH = os.getenv("DB_PATH", "queue.db")
@@ -133,8 +135,37 @@ async def set_counter_current_token(counter_id: int, token_id: Optional[int]) ->
         await db.commit()
 
 
+PBKDF2_ITERATIONS = 260000
+
+
 def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
+    salt = secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt.encode("utf-8"),
+        PBKDF2_ITERATIONS,
+    ).hex()
+    return f"pbkdf2_sha256${PBKDF2_ITERATIONS}${salt}${digest}"
+
+
+def _verify_password(password: str, stored_hash: str) -> bool:
+    if stored_hash.startswith("pbkdf2_sha256$"):
+        try:
+            _, iter_str, salt, expected = stored_hash.split("$", 3)
+            iterations = int(iter_str)
+        except (ValueError, TypeError):
+            return False
+        digest = hashlib.pbkdf2_hmac(
+            "sha256",
+            password.encode("utf-8"),
+            salt.encode("utf-8"),
+            iterations,
+        ).hex()
+        return hmac.compare_digest(digest, expected)
+    # Backward compatibility for older sha256-only hashes
+    legacy = hashlib.sha256(password.encode("utf-8")).hexdigest()
+    return hmac.compare_digest(legacy, stored_hash)
 
 
 async def add_staff(username: str, password: str, display_name: str = None) -> dict:
@@ -231,7 +262,7 @@ async def verify_staff(username: str, password: str) -> Optional[dict]:
         return None
     if int(staff.get("is_active") or 0) != 1:
         return None
-    if staff["password_hash"] != hash_password(password):
+    if not _verify_password(password, staff["password_hash"]):
         return None
     return staff
 

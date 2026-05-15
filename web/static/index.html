@@ -92,19 +92,22 @@
     // -----------------------------------------------------------------------
     // TTS Settings + TTS
     // -----------------------------------------------------------------------
+    const DEFAULT_TTS_RATE = '0.9';
+    const DEFAULT_TTS_PITCH = '1';
+    const DEFAULT_TTS_VOLUME = '1';
     let allVoices = [];
 
     function setDefaultTtsSettings() {
-      if (!localStorage.getItem('tts_rate')) localStorage.setItem('tts_rate', '0.9');
-      if (!localStorage.getItem('tts_pitch')) localStorage.setItem('tts_pitch', '1');
-      if (!localStorage.getItem('tts_volume')) localStorage.setItem('tts_volume', '1');
+      if (!localStorage.getItem('tts_rate')) localStorage.setItem('tts_rate', DEFAULT_TTS_RATE);
+      if (!localStorage.getItem('tts_pitch')) localStorage.setItem('tts_pitch', DEFAULT_TTS_PITCH);
+      if (!localStorage.getItem('tts_volume')) localStorage.setItem('tts_volume', DEFAULT_TTS_VOLUME);
     }
 
     function restoreTtsSettingsUI() {
       setDefaultTtsSettings();
-      const rate = localStorage.getItem('tts_rate') || '0.9';
-      const pitch = localStorage.getItem('tts_pitch') || '1';
-      const volume = localStorage.getItem('tts_volume') || '1';
+      const rate = localStorage.getItem('tts_rate') || DEFAULT_TTS_RATE;
+      const pitch = localStorage.getItem('tts_pitch') || DEFAULT_TTS_PITCH;
+      const volume = localStorage.getItem('tts_volume') || DEFAULT_TTS_VOLUME;
       document.getElementById('tts-rate').value = rate;
       document.getElementById('tts-pitch').value = pitch;
       document.getElementById('tts-volume').value = volume;
@@ -153,9 +156,9 @@
         const v = voices.find(v => v.name === savedVoiceName);
         if (v) utt.voice = v;
       }
-      utt.rate = parseFloat(localStorage.getItem('tts_rate') || '0.9');
-      utt.pitch = parseFloat(localStorage.getItem('tts_pitch') || '1');
-      utt.volume = parseFloat(localStorage.getItem('tts_volume') || '1');
+      utt.rate = parseFloat(localStorage.getItem('tts_rate') || DEFAULT_TTS_RATE);
+      utt.pitch = parseFloat(localStorage.getItem('tts_pitch') || DEFAULT_TTS_PITCH);
+      utt.volume = parseFloat(localStorage.getItem('tts_volume') || DEFAULT_TTS_VOLUME);
       window.speechSynthesis.speak(utt);
     }
 

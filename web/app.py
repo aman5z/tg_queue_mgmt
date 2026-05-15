@@ -32,9 +32,12 @@ from db.database import (
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Queue Management")
-SECRET_KEY = os.getenv("SECRET_KEY", "change-this-to-a-random-secret")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY environment variable is required for staff session signing.")
 SESSION_COOKIE_NAME = "staff_session"
 SESSION_MAX_AGE = 60 * 60 * 24 * 7
+SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
 serializer = URLSafeTimedSerializer(SECRET_KEY, salt="staff-session")
 
 # Mount static files
@@ -253,7 +256,8 @@ async def staff_login(request: Request):
         signed,
         max_age=SESSION_MAX_AGE,
         httponly=True,
-        samesite="lax",
+        secure=SESSION_COOKIE_SECURE,
+        samesite="strict",
     )
     return response
 
