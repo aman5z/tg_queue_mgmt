@@ -163,9 +163,7 @@ def _verify_password(password: str, stored_hash: str) -> bool:
             iterations,
         ).hex()
         return hmac.compare_digest(digest, expected)
-    # Backward compatibility for older sha256-only hashes
-    legacy = hashlib.sha256(password.encode("utf-8")).hexdigest()
-    return hmac.compare_digest(legacy, stored_hash)
+    return False
 
 
 async def add_staff(username: str, password: str, display_name: str = None) -> dict:

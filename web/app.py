@@ -242,7 +242,7 @@ async def staff_login_page():
 
 @app.post("/staff/login")
 async def staff_login(request: Request):
-    form = parse_qs((await request.body()).decode("utf-8"))
+    form = parse_qs((await request.body()).decode("utf-8", errors="replace"))
     username = (form.get("username", [""])[0] or "").strip()
     password = form.get("password", [""])[0] or ""
     staff = await verify_staff(username, password)
