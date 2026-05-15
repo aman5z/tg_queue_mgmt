@@ -34,12 +34,14 @@ tg_queue_mgmt/
 ├── web/
 │   ├── app.py             # FastAPI app with SSE /events endpoint
 │   └── static/
-│       ├── index.html     # TV display page
-│       ├── style.css      # Dark-theme styles
-│       ├── take.html      # Customer token-take form
-│       └── track.html     # Customer token-tracking page
+│       ├── index.html       # TV display page
+│       ├── style.css        # Dark-theme styles
+│       ├── take.html        # Customer token-take form
+│       ├── track.html       # Customer token-tracking page
+│       ├── staff_login.html # Staff login page
+│       └── staff_dashboard.html  # Staff counter operations dashboard
 ├── db/
-│   └── database.py        # DB init + all CRUD helpers
+│   └── database.py        # DB init + all CRUD helpers (aiosqlite)
 ├── setup.sh               # One-shot setup (venv + deps + .env)
 ├── run.sh                 # Start the bot + web server
 ├── Makefile               # Convenience shortcuts
@@ -98,11 +100,12 @@ nano .env
 | Variable | Required | Description |
 |---|---|---|
 | `BOT_TOKEN` | ✅ | Telegram bot token from [@BotFather](https://t.me/BotFather) |
-| `ADMIN_IDS` | recommended | Comma-separated Telegram user IDs with admin access |
+| `ADMIN_IDS` | recommended | Comma-separated Telegram user IDs with admin access. Leave empty to grant all users admin access (not recommended for production) |
 | `BASE_URL` | optional | Public URL of this server (default `http://localhost:8000`) |
 | `PORT` | optional | Web server port (default `8000`) |
-| `SECRET_KEY` | ✅ | Secret used to sign staff dashboard session cookies |
-| `SESSION_COOKIE_SECURE` | optional | Set `true` in HTTPS deployments so staff session cookie is sent only over TLS |
+| `SECRET_KEY` | ✅ | Secret used to sign staff dashboard session cookies. The app will fail to start if this is missing |
+| `SESSION_COOKIE_SECURE` | optional | Set `true` in HTTPS deployments so the staff session cookie is sent only over TLS (default `false`) |
+| `DB_PATH` | optional | Path to the SQLite database file (default `queue.db` in the working directory) |
 
 > **Tip:** To get your Telegram user ID, message [@userinfobot](https://t.me/userinfobot).
 
@@ -178,6 +181,39 @@ Open `http://<your-host>/` on a large screen or TV. The page:
 
 ---
 
+## REST API Reference
+
+All API endpoints are served by the FastAPI web server on port 8000.
+
+### Public Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/` | TV display page (full-screen token board) |
+| `GET` | `/take` | Customer token-take form |
+| `GET` | `/track/{id}` | Live token tracking page for a specific token |
+| `GET` | `/events` | SSE stream — real-time status updates for the display page |
+| `GET` | `/api/counters` | JSON list of all counters with `id`, `name`, and `status` |
+| `POST` | `/api/token` | Take a new token. Body: `{"name": str, "counter_id": int, "purpose": str\|null}` |
+| `GET` | `/api/track/{id}` | JSON tracking info for a token: position, status, current serving number |
+
+### Staff Endpoints (session cookie required)
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/staff/login` | Staff login page |
+| `POST` | `/staff/login` | Submit login credentials (form-encoded `username` + `password`) |
+| `GET` | `/staff/logout` | Log out and clear session cookie |
+| `GET` | `/staff` | Staff dashboard (redirects to login if not authenticated) |
+| `GET` | `/api/staff/counters` | JSON list of counters the logged-in staff member can operate |
+| `GET` | `/api/staff/status` | Full queue status snapshot |
+| `POST` | `/api/staff/token/next` | Call the next token. Body: `{"counter_id": int}` |
+| `POST` | `/api/staff/token/prev` | Revert to the previous token. Body: `{"counter_id": int}` |
+| `POST` | `/api/staff/token/recall` | Recall (re-announce) the current token. Body: `{"counter_id": int}` |
+| `POST` | `/api/staff/counter/toggle` | Toggle a counter between open/closed. Body: `{"counter_id": int}` |
+
+---
+
 ## Quick Reference (WSL)
 
 ```bash
@@ -236,12 +272,17 @@ make freeze   # save installed packages back to requirements.txt
                                             │  │ FastAPI │ │  web/app.py  SSE /events
                                             │  └────┬────┘ │
                                             └───────┼───────┘
-                                                    │ SSE stream
-                                     ┌──────────────▼──────────────┐
-                                     │  Browser (index.html)        │
-                                     │  TTS + Beep + Live display   │
-                                     └─────────────────────────────┘
+                                                    │ HTTP / SSE
+                               ┌────────────────────┼─────────────────────┐
+                               │                    │                     │
+                    ┌──────────▼──────────┐  ┌──────▼──────┐  ┌──────────▼──────────┐
+                    │  Browser (index.html)│  │ take.html / │  │  staff_login.html / │
+                    │  TTS + Beep + Live  │  │  track.html │  │  staff_dashboard    │
+                    │  display (TV view)  │  │  (Customer) │  │  (Staff web UI)     │
+                    └─────────────────────┘  └─────────────┘  └─────────────────────┘
 ```
+
+> **Token numbering** resets to 1 each day per counter. Tokens created on the same calendar day share a sequential numbering sequence.
 
 ---
 
