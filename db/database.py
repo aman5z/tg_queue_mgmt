@@ -1,7 +1,10 @@
 """Database initialisation and CRUD helpers for tg_queue_mgmt."""
 
 import aiosqlite
+import hmac
+import hashlib
 import os
+import secrets
 from typing import Optional
 
 DB_PATH = os.getenv("DB_PATH", "queue.db")
@@ -29,6 +32,16 @@ CREATE TABLE IF NOT EXISTS tokens (
     status TEXT DEFAULT 'waiting',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     called_at TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS staff (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    display_name TEXT,
+    assigned_counters TEXT DEFAULT '',
+    is_active INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 """
 
@@ -82,10 +95,10 @@ async def get_counter_by_name(name: str) -> Optional[dict]:
 async def add_counter(name: str) -> dict:
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
-            "INSERT INTO counters (name) VALUES (?)", (name,)
+            "INSERT INTO counters (name, status) VALUES (?, 'open')", (name,)
         )
         await db.commit()
-        return {"id": cursor.lastrowid, "name": name, "status": "closed"}
+        return {"id": cursor.lastrowid, "name": name, "status": "open"}
 
 
 async def rename_counter(counter_id: int, new_name: str) -> bool:
@@ -120,6 +133,136 @@ async def set_counter_current_token(counter_id: int, token_id: Optional[int]) ->
             (token_id, counter_id),
         )
         await db.commit()
+
+
+PBKDF2_ITERATIONS = 260000
+
+
+def hash_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt.encode("utf-8"),
+        PBKDF2_ITERATIONS,
+    ).hex()
+    return f"pbkdf2_sha256${PBKDF2_ITERATIONS}${salt}${digest}"
+
+
+def _verify_password(password: str, stored_hash: str) -> bool:
+    if stored_hash.startswith("pbkdf2_sha256$"):
+        try:
+            _, iter_str, salt, expected = stored_hash.split("$", 3)
+            iterations = int(iter_str)
+        except (ValueError, TypeError):
+            return False
+        digest = hashlib.pbkdf2_hmac(
+            "sha256",
+            password.encode("utf-8"),
+            salt.encode("utf-8"),
+            iterations,
+        ).hex()
+        return hmac.compare_digest(digest, expected)
+    return False
+
+
+async def add_staff(username: str, password: str, display_name: str = None) -> dict:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            """
+            INSERT INTO staff (username, password_hash, display_name)
+            VALUES (?, ?, ?)
+            """,
+            (username, hash_password(password), display_name),
+        )
+        await db.commit()
+        return {
+            "id": cursor.lastrowid,
+            "username": username,
+            "display_name": display_name,
+            "assigned_counters": "",
+            "is_active": 1,
+        }
+
+
+async def get_staff(username: str) -> Optional[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT * FROM staff WHERE username = ?",
+            (username,),
+        )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def get_staff_by_id(staff_id: int) -> Optional[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT * FROM staff WHERE id = ?",
+            (staff_id,),
+        )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def list_staff() -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("SELECT * FROM staff ORDER BY id")
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def remove_staff(staff_id: int) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute("DELETE FROM staff WHERE id = ?", (staff_id,))
+        await db.commit()
+        return cursor.rowcount > 0
+
+
+async def update_staff_password(staff_id: int, new_password: str) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            "UPDATE staff SET password_hash = ? WHERE id = ?",
+            (hash_password(new_password), staff_id),
+        )
+        await db.commit()
+        return cursor.rowcount > 0
+
+
+async def update_staff_counters(staff_id: int, counter_ids: list[int]) -> bool:
+    deduped = sorted({int(cid) for cid in counter_ids})
+    assigned = ",".join(str(cid) for cid in deduped)
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            "UPDATE staff SET assigned_counters = ? WHERE id = ?",
+            (assigned, staff_id),
+        )
+        await db.commit()
+        return cursor.rowcount > 0
+
+
+async def set_staff_active(staff_id: int, is_active: bool) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            "UPDATE staff SET is_active = ? WHERE id = ?",
+            (1 if is_active else 0, staff_id),
+        )
+        await db.commit()
+        return cursor.rowcount > 0
+
+
+async def verify_staff(username: str, password: str) -> Optional[dict]:
+    staff = await get_staff(username)
+    if not staff:
+        return None
+    if int(staff.get("is_active") or 0) != 1:
+        return None
+    if not _verify_password(password, staff["password_hash"]):
+        return None
+    return staff
 
 
 # ---------------------------------------------------------------------------

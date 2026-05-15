@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Staff Login — Queue Management</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="form-page">
+    <div class="form-card">
+      <h1>Staff Login — Queue Management</h1>
+      <form method="post" action="/staff/login">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" required />
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" required />
+        </div>
+        <button type="submit" class="btn-primary">Login</button>
+      </form>
+      <p id="login-error" style="display:none;color:#ee3355;margin-top:0.9rem;">Invalid username or password.</p>
+    </div>
+  </div>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('error') === '1') {
+      document.getElementById('login-error').style.display = 'block';
+    }
+  </script>
+</body>
+</html>

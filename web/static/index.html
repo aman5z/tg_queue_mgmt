@@ -7,6 +7,36 @@
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
+  <button id="tts-settings-btn" class="tts-settings-btn" aria-label="Open TTS settings">⚙️</button>
+  <div id="tts-overlay" class="tts-overlay hidden">
+    <div class="tts-panel">
+      <h3>TTS Settings</h3>
+      <div class="form-group">
+        <label for="tts-lang-filter">Language filter</label>
+        <input type="text" id="tts-lang-filter" placeholder="Filter by language, e.g. en, ms, ar" />
+      </div>
+      <div class="form-group">
+        <label for="tts-voice">Voice</label>
+        <select id="tts-voice"></select>
+      </div>
+      <div class="form-group">
+        <label for="tts-rate">Rate <span id="tts-rate-value">0.9</span></label>
+        <input type="range" id="tts-rate" min="0.5" max="1.5" step="0.1" value="0.9" />
+      </div>
+      <div class="form-group">
+        <label for="tts-pitch">Pitch <span id="tts-pitch-value">1</span></label>
+        <input type="range" id="tts-pitch" min="0.5" max="2" step="0.1" value="1" />
+      </div>
+      <div class="form-group">
+        <label for="tts-volume">Volume <span id="tts-volume-value">1</span></label>
+        <input type="range" id="tts-volume" min="0" max="1" step="0.1" value="1" />
+      </div>
+      <div class="tts-actions">
+        <button id="tts-test-btn" class="btn-primary" type="button">Test Voice</button>
+        <button id="tts-close-btn" class="btn-secondary" type="button">Close</button>
+      </div>
+    </div>
+  </div>
   <header>
     <div id="clock"></div>
     <h1>Queue Management System</h1>
@@ -60,14 +90,75 @@
     }
 
     // -----------------------------------------------------------------------
-    // TTS
+    // TTS Settings + TTS
     // -----------------------------------------------------------------------
+    const DEFAULT_TTS_RATE = '0.9';
+    const DEFAULT_TTS_PITCH = '1';
+    const DEFAULT_TTS_VOLUME = '1';
+    let allVoices = [];
+
+    function setDefaultTtsSettings() {
+      if (!localStorage.getItem('tts_rate')) localStorage.setItem('tts_rate', DEFAULT_TTS_RATE);
+      if (!localStorage.getItem('tts_pitch')) localStorage.setItem('tts_pitch', DEFAULT_TTS_PITCH);
+      if (!localStorage.getItem('tts_volume')) localStorage.setItem('tts_volume', DEFAULT_TTS_VOLUME);
+    }
+
+    function restoreTtsSettingsUI() {
+      setDefaultTtsSettings();
+      const rate = localStorage.getItem('tts_rate') || DEFAULT_TTS_RATE;
+      const pitch = localStorage.getItem('tts_pitch') || DEFAULT_TTS_PITCH;
+      const volume = localStorage.getItem('tts_volume') || DEFAULT_TTS_VOLUME;
+      document.getElementById('tts-rate').value = rate;
+      document.getElementById('tts-pitch').value = pitch;
+      document.getElementById('tts-volume').value = volume;
+      document.getElementById('tts-rate-value').textContent = rate;
+      document.getElementById('tts-pitch-value').textContent = pitch;
+      document.getElementById('tts-volume-value').textContent = volume;
+    }
+
+    function saveSliderSetting(key, valueId, value) {
+      localStorage.setItem(key, value);
+      document.getElementById(valueId).textContent = value;
+    }
+
+    function renderVoiceOptions() {
+      const select = document.getElementById('tts-voice');
+      const filter = (document.getElementById('tts-lang-filter').value || '').trim().toLowerCase();
+      const selected = localStorage.getItem('tts_voice') || '';
+      const filtered = allVoices.filter(v => !filter || (v.lang || '').toLowerCase().includes(filter));
+      select.innerHTML = '';
+      filtered.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.name;
+        opt.textContent = `${v.name} (${v.lang})`;
+        if (v.name === selected) opt.selected = true;
+        select.appendChild(opt);
+      });
+      if (!select.value && filtered.length) {
+        select.value = filtered[0].name;
+        localStorage.setItem('tts_voice', filtered[0].name);
+      }
+    }
+
+    function loadVoices() {
+      if (!window.speechSynthesis) return;
+      allVoices = window.speechSynthesis.getVoices();
+      renderVoiceOptions();
+    }
+
     function speak(text) {
       if (!window.speechSynthesis) return;
       window.speechSynthesis.cancel();
       const utt = new SpeechSynthesisUtterance(text);
-      utt.lang = 'en-US';
-      utt.rate = 0.9;
+      const savedVoiceName = localStorage.getItem('tts_voice');
+      const voices = window.speechSynthesis.getVoices();
+      if (savedVoiceName) {
+        const v = voices.find(v => v.name === savedVoiceName);
+        if (v) utt.voice = v;
+      }
+      utt.rate = parseFloat(localStorage.getItem('tts_rate') || DEFAULT_TTS_RATE);
+      utt.pitch = parseFloat(localStorage.getItem('tts_pitch') || DEFAULT_TTS_PITCH);
+      utt.volume = parseFloat(localStorage.getItem('tts_volume') || DEFAULT_TTS_VOLUME);
       window.speechSynthesis.speak(utt);
     }
 
@@ -181,6 +272,34 @@
         setTimeout(connect, 3000);
       };
     }
+    restoreTtsSettingsUI();
+    loadVoices();
+    if (window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+
+    document.getElementById('tts-settings-btn').addEventListener('click', () => {
+      document.getElementById('tts-overlay').classList.remove('hidden');
+    });
+    document.getElementById('tts-close-btn').addEventListener('click', () => {
+      document.getElementById('tts-overlay').classList.add('hidden');
+    });
+    document.getElementById('tts-lang-filter').addEventListener('input', renderVoiceOptions);
+    document.getElementById('tts-voice').addEventListener('change', (e) => {
+      localStorage.setItem('tts_voice', e.target.value);
+    });
+    document.getElementById('tts-rate').addEventListener('input', (e) => {
+      saveSliderSetting('tts_rate', 'tts-rate-value', e.target.value);
+    });
+    document.getElementById('tts-pitch').addEventListener('input', (e) => {
+      saveSliderSetting('tts_pitch', 'tts-pitch-value', e.target.value);
+    });
+    document.getElementById('tts-volume').addEventListener('input', (e) => {
+      saveSliderSetting('tts_volume', 'tts-volume-value', e.target.value);
+    });
+    document.getElementById('tts-test-btn').addEventListener('click', () => {
+      speak('Token number 5, please proceed to Counter A');
+    });
     connect();
   </script>
 </body>

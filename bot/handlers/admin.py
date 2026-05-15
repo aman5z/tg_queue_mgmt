@@ -24,6 +24,13 @@ from db.database import (
     get_waiting_tokens,
     get_current_token_for_counter,
     reset_queue,
+    add_staff,
+    get_staff,
+    list_staff,
+    remove_staff,
+    update_staff_password,
+    update_staff_counters,
+    set_staff_active,
 )
 from bot.keyboards import counters_keyboard, counter_actions_keyboard, confirm_keyboard
 from web.app import broadcast_update
@@ -89,9 +96,12 @@ async def cmd_addcounter(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text("Usage: /addcounter <name>")
         return
     name = " ".join(context.args).strip()
-    counter = await add_counter(name)
+    await add_counter(name)
     await broadcast_update()
-    await update.message.reply_text(f"✅ Counter *{name}* (ID {counter['id']}) created.", parse_mode="Markdown")
+    await update.message.reply_text(
+        f"✅ Counter *{name}* created and is now **open**.",
+        parse_mode="Markdown",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -226,6 +236,13 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/resetqueue — clear all queues\n"
         "/status — overall status\n"
         "/qr — generate QR for token page\n"
+        "/users — list staff users\n"
+        "/adduser <username> <password> [display name] — add staff user\n"
+        "/removeuser <username> — remove staff user\n"
+        "/setpassword <username> <new password> — set staff password\n"
+        "/assigncounters <username> <counter_id,...> — assign counters\n"
+        "/deactivateuser <username> — disable staff login\n"
+        "/activateuser <username> — enable staff login\n"
         "/help — this message\n\n"
         "*Customer Commands:*\n"
         "/start — take a token\n"
@@ -480,13 +497,139 @@ async def receive_counter_name(update: Update, context: ContextTypes.DEFAULT_TYP
     if not name:
         await update.message.reply_text("Name cannot be empty. Try again:")
         return WAITING_COUNTER_NAME
-    counter = await add_counter(name)
+    await add_counter(name)
     await broadcast_update()
     await update.message.reply_text(
-        f"✅ Counter *{name}* (ID {counter['id']}) created.",
+        f"✅ Counter *{name}* created and is now **open**.",
         parse_mode="Markdown",
     )
     return ConversationHandler.END
+
+
+async def cmd_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _require_admin(update):
+        return
+    users = await list_staff()
+    if not users:
+        await update.message.reply_text("No staff users configured yet.")
+        return
+    lines = ["👥 *Staff Users*"]
+    for u in users:
+        status = "active" if int(u.get("is_active") or 0) == 1 else "inactive"
+        name = u.get("display_name") or "—"
+        assigned = u.get("assigned_counters") or "all"
+        lines.append(
+            f"- *{u['username']}* ({status})\n  id: {u['id']} | name: {name} | counters: {assigned}"
+        )
+    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+
+async def cmd_adduser(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _require_admin(update):
+        return
+    if len(context.args) < 2:
+        await update.message.reply_text("Usage: /adduser <username> <password> [display_name]")
+        return
+    username = context.args[0].strip()
+    password = context.args[1]
+    display_name = " ".join(context.args[2:]).strip() or None
+    if await get_staff(username):
+        await update.message.reply_text("User already exists.")
+        return
+    staff = await add_staff(username, password, display_name)
+    await update.message.reply_text(
+        f"✅ Staff user *{staff['username']}* created.",
+        parse_mode="Markdown",
+    )
+
+
+async def cmd_removeuser(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _require_admin(update):
+        return
+    if len(context.args) != 1:
+        await update.message.reply_text("Usage: /removeuser <username>")
+        return
+    username = context.args[0].strip()
+    user = await get_staff(username)
+    if not user:
+        await update.message.reply_text("User not found.")
+        return
+    await remove_staff(user["id"])
+    await update.message.reply_text(f"🗑 Staff user *{username}* removed.", parse_mode="Markdown")
+
+
+async def cmd_setpassword(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _require_admin(update):
+        return
+    if len(context.args) < 2:
+        await update.message.reply_text("Usage: /setpassword <username> <new_password>")
+        return
+    username = context.args[0].strip()
+    new_password = context.args[1]
+    user = await get_staff(username)
+    if not user:
+        await update.message.reply_text("User not found.")
+        return
+    await update_staff_password(user["id"], new_password)
+    await update.message.reply_text(f"🔐 Password updated for *{username}*.", parse_mode="Markdown")
+
+
+async def cmd_assigncounters(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _require_admin(update):
+        return
+    if len(context.args) != 2:
+        await update.message.reply_text("Usage: /assigncounters <username> <counter_id,...>")
+        return
+    username = context.args[0].strip()
+    raw_ids = context.args[1].strip()
+    user = await get_staff(username)
+    if not user:
+        await update.message.reply_text("User not found.")
+        return
+    if raw_ids == "":
+        counter_ids = []
+    else:
+        try:
+            counter_ids = [int(v.strip()) for v in raw_ids.split(",") if v.strip()]
+        except ValueError:
+            await update.message.reply_text("Counter IDs must be comma-separated numbers.")
+            return
+    await update_staff_counters(user["id"], counter_ids)
+    assigned = ", ".join(str(c) for c in sorted(set(counter_ids))) if counter_ids else "all counters"
+    await update.message.reply_text(
+        f"✅ Assigned counters for *{username}*: {assigned}.",
+        parse_mode="Markdown",
+    )
+
+
+async def cmd_deactivateuser(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _require_admin(update):
+        return
+    if len(context.args) != 1:
+        await update.message.reply_text("Usage: /deactivateuser <username>")
+        return
+    username = context.args[0].strip()
+    user = await get_staff(username)
+    if not user:
+        await update.message.reply_text("User not found.")
+        return
+    await set_staff_active(user["id"], False)
+    await update.message.reply_text(f"🚫 User *{username}* deactivated.", parse_mode="Markdown")
+
+
+async def cmd_activateuser(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await _require_admin(update):
+        return
+    if len(context.args) != 1:
+        await update.message.reply_text("Usage: /activateuser <username>")
+        return
+    username = context.args[0].strip()
+    user = await get_staff(username)
+    if not user:
+        await update.message.reply_text("User not found.")
+        return
+    await set_staff_active(user["id"], True)
+    await update.message.reply_text(f"✅ User *{username}* activated.", parse_mode="Markdown")
 
 
 async def receive_rename_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -520,6 +663,13 @@ def register_admin_handlers(app) -> None:
     app.add_handler(CommandHandler("resetqueue", cmd_resetqueue))
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("qr", cmd_qr))
+    app.add_handler(CommandHandler("users", cmd_users))
+    app.add_handler(CommandHandler("adduser", cmd_adduser))
+    app.add_handler(CommandHandler("removeuser", cmd_removeuser))
+    app.add_handler(CommandHandler("setpassword", cmd_setpassword))
+    app.add_handler(CommandHandler("assigncounters", cmd_assigncounters))
+    app.add_handler(CommandHandler("deactivateuser", cmd_deactivateuser))
+    app.add_handler(CommandHandler("activateuser", cmd_activateuser))
 
     # Inline keyboard callbacks (exclude add/rename — handled by ConversationHandler below)
     app.add_handler(CallbackQueryHandler(callback_counter_list, pattern="^counter_list$"))
