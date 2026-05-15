@@ -101,6 +101,7 @@ nano .env
 | `ADMIN_IDS` | recommended | Comma-separated Telegram user IDs with admin access |
 | `BASE_URL` | optional | Public URL of this server (default `http://localhost:8000`) |
 | `PORT` | optional | Web server port (default `8000`) |
+| `SECRET_KEY` | recommended | Secret used to sign staff dashboard session cookies |
 
 > **Tip:** To get your Telegram user ID, message [@userinfobot](https://t.me/userinfobot).
 
@@ -131,6 +132,13 @@ This starts both the Telegram bot (long-polling) and the FastAPI web server on p
 | `/status` | Overall queue status |
 | `/resetqueue` | Clear all queues (with confirmation) |
 | `/qr` | Generate QR code for the token-take page |
+| `/users` | List all staff users |
+| `/adduser <username> <password> [display_name]` | Create a staff user |
+| `/removeuser <username>` | Remove a staff user |
+| `/setpassword <username> <new_password>` | Change staff password |
+| `/assigncounters <username> <counter_id,...>` | Assign counters to staff |
+| `/deactivateuser <username>` | Disable staff login |
+| `/activateuser <username>` | Re-enable staff login |
 | `/help` | Command reference |
 
 **Inline keyboard actions** (via `/counters`):
@@ -156,6 +164,16 @@ Open `http://<your-host>/` on a large screen or TV. The page:
 - Reads aloud: *"Token [number], please proceed to [Counter name]"*
 - Plays a beep sound on every update
 - Shows per-counter status and the full waiting list
+
+### Staff Dashboard
+
+1. Create a staff user in Telegram:
+   - `/adduser staff1 pass123 Staff One`
+2. Optionally assign counters:
+   - `/assigncounters staff1 1,2`
+   - Leave assignments empty to allow all counters.
+3. Open `http://<your-host>:8000/staff` and log in.
+4. Staff can call next/previous/recall tokens and toggle open/close for their assigned counters.
 
 ---
 

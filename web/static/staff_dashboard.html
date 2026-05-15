@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Staff Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="staff-page">
+    <div class="staff-header">
+      <div class="staff-header-left">
+        <h1>Staff Dashboard</h1>
+        <div class="staff-user">Logged in as <strong id="staff-username"></strong></div>
+        <a class="logout-link" href="/staff/logout">Logout</a>
+      </div>
+      <div id="clock"></div>
+    </div>
+    <div id="staff-grid" class="staff-grid"></div>
+  </div>
+
+  <script>
+    const USERNAME = {{USERNAME}};
+    document.getElementById('staff-username').textContent = USERNAME;
+
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock').textContent = now.toLocaleString();
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    let counters = [];
+
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    async function fetchCounters() {
+      const res = await fetch('/api/staff/counters');
+      if (res.redirected) {
+        window.location.href = res.url;
+        return;
+      }
+      counters = await res.json();
+      renderCounters();
+    }
+
+    async function postAction(path, counterId) {
+      await fetch(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ counter_id: counterId })
+      });
+      await fetchCounters();
+    }
+
+    function renderCounters() {
+      const grid = document.getElementById('staff-grid');
+      grid.innerHTML = '';
+      counters.forEach(c => {
+        const card = document.createElement('div');
+        card.className = 'staff-counter-card ' + (c.status === 'open' ? 'open' : 'closed');
+        card.innerHTML =
+          `<div class="staff-counter-title">
+            <strong>${escHtml(c.name)}</strong>
+            <span class="counter-status">${c.status === 'open' ? 'Open' : 'Closed'}</span>
+          </div>
+          <div class="staff-counter-token">${c.current_token !== null ? '#' + c.current_token : '—'}</div>
+          <div class="staff-meta">Waiting: ${c.waiting_count}</div>
+          <div class="staff-actions">
+            <button data-action="next">⏭ Next Token</button>
+            <button data-action="recall">🔁 Recall</button>
+            <button data-action="prev">⏮ Previous</button>
+            <button data-action="toggle">${c.status === 'open' ? '🔴 Close' : '🟢 Open'}</button>
+          </div>`;
+        card.querySelector('[data-action="next"]').onclick = () => postAction('/api/staff/token/next', c.id);
+        card.querySelector('[data-action="recall"]').onclick = () => postAction('/api/staff/token/recall', c.id);
+        card.querySelector('[data-action="prev"]').onclick = () => postAction('/api/staff/token/prev', c.id);
+        card.querySelector('[data-action="toggle"]').onclick = () => postAction('/api/staff/counter/toggle', c.id);
+        grid.appendChild(card);
+      });
+      if (!counters.length) {
+        grid.innerHTML = '<p class="empty">No counters assigned.</p>';
+      }
+    }
+
+    function connectEvents() {
+      const es = new EventSource('/events');
+      es.onmessage = () => fetchCounters();
+      es.onerror = () => {
+        es.close();
+        setTimeout(connectEvents, 3000);
+      };
+    }
+
+    fetchCounters();
+    connectEvents();
+  </script>
+</body>
+</html>

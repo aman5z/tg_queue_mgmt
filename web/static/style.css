@@ -287,6 +287,19 @@ main {
 
 .btn-primary:hover { opacity: 0.88; }
 .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-secondary {
+  width: 100%;
+  padding: 0.75rem;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.btn-secondary:hover { opacity: 0.88; }
 
 /* Token result */
 .token-result {
@@ -349,3 +362,122 @@ main {
 .track-box .status-badge.serving  { background: #0f2a10; color: var(--green); border: 1px solid var(--green); }
 .track-box .status-badge.done     { background: #2a1010; color: var(--red);   border: 1px solid var(--red);   }
 .track-box .status-badge.skipped  { background: #2a1a00; color: #cc8800;      border: 1px solid #cc8800;      }
+
+/* ===== TTS settings overlay ===== */
+.tts-settings-btn {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 50;
+  background: var(--surface);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  width: 2.4rem;
+  height: 2.4rem;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+.tts-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+}
+.tts-overlay.hidden { display: none; }
+.tts-panel {
+  width: min(560px, 92vw);
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  padding: 1.2rem;
+}
+.tts-panel h3 {
+  color: var(--accent);
+  margin-bottom: 1rem;
+}
+.tts-actions {
+  margin-top: 0.5rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+}
+
+/* ===== Staff dashboard ===== */
+.staff-page {
+  min-height: 100vh;
+  padding: 1.2rem;
+}
+.staff-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  padding: 1rem 1.1rem;
+}
+.staff-header-left h1 {
+  color: var(--accent);
+  font-size: 1.1rem;
+  margin-bottom: 0.25rem;
+}
+.staff-user {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.logout-link {
+  display: inline-block;
+  margin-top: 0.35rem;
+  color: var(--text);
+  text-decoration: none;
+}
+.staff-grid {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+.staff-counter-card {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+}
+.staff-counter-card.open { border-color: var(--green); }
+.staff-counter-card.closed { border-color: var(--red); }
+.staff-counter-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+}
+.staff-counter-token {
+  font-size: 2.4rem;
+  font-weight: 900;
+  color: var(--accent);
+  margin: 0.45rem 0;
+}
+.staff-meta {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.staff-actions {
+  margin-top: 0.8rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+.staff-actions button {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0.45rem 0.5rem;
+  cursor: pointer;
+}
+.staff-actions button:hover { border-color: var(--accent); }
