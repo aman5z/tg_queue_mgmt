@@ -40,6 +40,9 @@ tg_queue_mgmt/
 │       └── track.html     # Customer token-tracking page
 ├── db/
 │   └── database.py        # DB init + all CRUD helpers
+├── setup.sh               # One-shot setup (venv + deps + .env)
+├── run.sh                 # Start the bot + web server
+├── Makefile               # Convenience shortcuts
 ├── .env.example
 ├── requirements.txt
 └── README.md
@@ -49,19 +52,47 @@ tg_queue_mgmt/
 
 ## Setup
 
-### 1. Clone and install
+> Works on **any Linux distro** (Debian, Ubuntu, Arch, Fedora) and **WSL** (WSL1/WSL2 on Windows).
+
+### Prerequisites
+
+You only need **Python 3.9+** and **git**. The setup script handles everything else.
+
+```bash
+# Debian / Ubuntu / WSL (Ubuntu)
+sudo apt-get install -y git python3 python3-venv python3-full
+
+# Arch Linux
+sudo pacman -S git python
+
+# Fedora / RHEL
+sudo dnf install -y git python3 python3-virtualenv
+```
+
+### 1. Clone
 
 ```bash
 git clone https://github.com/aman5z/tg_queue_mgmt.git
 cd tg_queue_mgmt
-pip install -r requirements.txt
 ```
 
-### 2. Configure environment
+### 2. Run setup (one command)
 
 ```bash
-cp .env.example .env
-# Edit .env and set BOT_TOKEN and ADMIN_IDS
+bash setup.sh
+```
+
+This will:
+- Detect your Python installation
+- Auto-install `python3-venv` if missing (on apt/dnf/pacman systems)
+- Create a `./venv` virtual environment
+- Install all dependencies from `requirements.txt`
+- Copy `.env.example` → `.env` if not already present
+
+### 3. Configure `.env`
+
+```bash
+nano .env
 ```
 
 | Variable | Required | Description |
@@ -71,10 +102,14 @@ cp .env.example .env
 | `BASE_URL` | optional | Public URL of this server (default `http://localhost:8000`) |
 | `PORT` | optional | Web server port (default `8000`) |
 
-### 3. Run
+> **Tip:** To get your Telegram user ID, message [@userinfobot](https://t.me/userinfobot).
+
+### 4. Run
 
 ```bash
-python bot/main.py
+bash run.sh
+# or
+make run
 ```
 
 This starts both the Telegram bot (long-polling) and the FastAPI web server on port 8000.
@@ -121,6 +156,42 @@ Open `http://<your-host>/` on a large screen or TV. The page:
 - Reads aloud: *"Token [number], please proceed to [Counter name]"*
 - Plays a beep sound on every update
 - Shows per-counter status and the full waiting list
+
+---
+
+## Quick Reference (WSL)
+
+```bash
+# First time
+git clone https://github.com/aman5z/tg_queue_mgmt.git
+cd tg_queue_mgmt
+bash setup.sh
+nano .env          # set BOT_TOKEN + ADMIN_IDS
+bash run.sh
+
+# Every subsequent time
+cd tg_queue_mgmt
+bash run.sh
+```
+
+Find your WSL machine's IP for network access:
+```bash
+hostname -I | awk '{print $1}'
+```
+
+Then open `http://<that-ip>:8000` from other devices on the same network.
+
+---
+
+## Makefile Shortcuts
+
+```bash
+make setup    # same as bash setup.sh
+make run      # same as bash run.sh
+make install  # re-install/update deps inside venv
+make clean    # remove venv and __pycache__
+make freeze   # save installed packages back to requirements.txt
+```
 
 ---
 
