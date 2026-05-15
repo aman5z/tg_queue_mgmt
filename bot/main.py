@@ -52,11 +52,14 @@ async def main():
     port = int(os.getenv("PORT", "8000"))
 
     # Import DB and handlers here (after load_dotenv so env vars are available)
-    from db.database import init_db
+    from db.database import init_db, get_setting
     from bot.handlers.admin import register_admin_handlers
     from bot.handlers.customer import register_customer_handlers
 
     await init_db()
+    db_port = await get_setting("port", "")
+    if db_port and db_port.isdigit():
+        port = int(db_port)
     logger.info("Database initialised")
 
     builder = ApplicationBuilder().token(bot_token)

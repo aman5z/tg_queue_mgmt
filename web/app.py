@@ -27,6 +27,7 @@ from db.database import (
     recall_current_token,
     set_counter_status,
     get_waiting_tokens,
+    get_setting,
 )
 
 logger = logging.getLogger(__name__)
@@ -132,12 +133,16 @@ async def broadcast_update() -> None:
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
-    return HTMLResponse(content=_html_cache.get("index.html", ""))
+    title = await get_setting("display_title", "Queue Management System")
+    content = _html_cache.get("index.html", "").replace("{{DISPLAY_TITLE}}", title)
+    return HTMLResponse(content=content)
 
 
 @app.get("/take", response_class=HTMLResponse)
 async def take_page():
-    return HTMLResponse(content=_html_cache.get("take.html", ""))
+    title = await get_setting("take_title", "Take a Token")
+    content = _html_cache.get("take.html", "").replace("{{TAKE_TITLE}}", title)
+    return HTMLResponse(content=content)
 
 
 @app.get("/track/{token_id}", response_class=HTMLResponse)
